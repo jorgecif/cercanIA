@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cercanía a la IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 40px; width: 40px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 32 32"><text x="0" y="26" font-size="26">🤖</text></svg>') center/cover;
+            cursor: pointer; margin-top: -16px; transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 10px; background: #cbd5e1; border-radius: 5px; }
+        input[type=range]:focus { outline: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-2xl shadow-xl border border-gray-100">
+        
+        <!-- VISTA DEL ESTUDIANTE -->
+        <div id="studentView" class="hidden">
+            <h1 ondblclick="window.location.href='?view=admin'" class="text-2xl md:text-3xl font-bold text-center mb-2 text-indigo-700 cursor-default select-none">Tu relación con la IA</h1>
+            
+            <div id="loginSection" class="flex flex-col items-center justify-center py-10 space-y-4">
+                <p class="text-gray-500 mb-4 text-center">Ingresa tu nombre para participar en la dinámica.</p>
+                <input type="text" id="studentName" placeholder="Ej. Juan Pérez" class="px-4 py-3 border-2 rounded-lg w-full max-w-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-center text-lg">
+                <button onclick="startStudent()" class="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition w-full max-w-sm">Entrar al tablero</button>
+            </div>
+
+            <div id="dialSection" class="hidden flex-col items-center py-8 space-y-8">
+                <div class="text-6xl bg-indigo-50 p-6 rounded-full border-4 border-indigo-100 shadow-inner" id="studentAvatar">🧑‍🚀</div>
+                <h2 class="text-2xl font-bold text-gray-700" id="welcomeName">Hola, </h2>
+                <p class="text-center text-gray-600">Mueve el dial para indicar qué tan cerca o lejos te sientes de la Inteligencia Artificial en tu día a día.</p>
+                
+                <div class="w-full max-w-lg space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                    <div class="flex justify-between text-sm font-bold text-gray-500">
+                        <span>Muy lejos</span>
+                        <span>Muy cerca</span>
+                    </div>
+                    <input type="range" id="mainDial" min="0" max="100" value="50" onchange="autoSaveDial()">
+                    <div class="text-center mt-2 h-6">
+                        <span id="saveStatus" class="text-sm font-semibold text-gray-400">Mueve el dial para registrar tu respuesta</span>
+                    </div>
+                </div>
+
+                <button onclick="deleteStudent()" class="text-red-500 hover:text-red-700 text-sm underline mt-8">Me equivoqué en mi nombre (Volver a empezar)</button>
+            </div>
+        </div>
+
+        <!-- VISTA DEL PROFESOR / DASHBOARD -->
+        <div id="adminView" class="hidden">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+                <h1 class="text-3xl font-bold text-indigo-700">Tablero de Resultados</h1>
+                
+                <!-- Panel de Control de Fases -->
+                <div class="flex flex-col sm:flex-row gap-3 items-center bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                    <div class="text-sm">
+                        Estado: <span id="currentPhaseLabel" class="font-bold text-indigo-700 bg-white px-2 py-1 rounded">Cargando...</span>
+                    </div>
+                    <button id="btnFase1" onclick="changePhase(1)" class="hidden bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm font-bold">Volver a Fase 1</button>
+                    <button id="btnFase2" onclick="changePhase(2)" class="hidden bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm font-bold shadow-md animate-pulse">¡Habilitar Fase 2!</button>
+                    <button onclick="fetchAdminData()" class="bg-indigo-600 text-white px-4 py-1.5 rounded hover:bg-indigo-700 text-sm font-bold flex gap-2 items-center ml-2">
+                        <span>🔄</span> Actualizar
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Lista de comparación -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 max-h-[500px] overflow-y-auto" id="adminList">
+                    <p class="text-center text-gray-400 mt-10">Cargando datos...</p>
+                </div>
+
+                <!-- Gráfico Agregado -->
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center">
+                    <h2 class="text-xl font-bold mb-4 text-gray-700">Comparación General Promedio</h2>
+                    <canvas id="adminChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeW15YSvD3Xc72v6fL4QVEl606ze8igI0Uu0XWk-9LuKlwSJ1NLBV-PeQikHmn7JUAtA/exec'; // <--- PEGA TU URL DE APPS SCRIPT AQUÍ
+        const avatars = ['🧑‍🚀', '👽', '👻', '🤠', '👾', '🐵', '🕵️', '🦸'];
+        let chartInstance = null;
+        let globalPhase = 1;
+
+        // --- ENRUTAMIENTO ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.get('view') === 'admin';
+
+        if (isAdmin) {
+            document.getElementById('adminView').classList.remove('hidden');
+            document.body.classList.remove('flex', 'items-center'); 
+            fetchAdminData();
+        } else {
+            document.getElementById('studentView').classList.remove('hidden');
+            checkExistingSession();
+        }
+
+        // ==========================================
+        // LÓGICA DEL ESTUDIANTE
+        // ==========================================
+        function checkExistingSession() {
+            const savedData = localStorage.getItem('ia_student_data');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                showDial(data.name, data.avatar);
+            }
+        }
+
+        function startStudent() {
+            const name = document.getElementById('studentName').value.trim();
+            if (!name) return alert('Por favor ingresa tu nombre');
+            
+            const avatar = avatars[Math.floor(Math.random() * avatars.length)];
+            const studentData = { name, avatar };
+            
+            localStorage.setItem('ia_student_data', JSON.stringify(studentData));
+            showDial(name, avatar);
+            autoSaveDial(50);
+        }
+
+        function showDial(name, avatar) {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('dialSection').classList.remove('hidden');
+            document.getElementById('dialSection').classList.add('flex');
+            document.getElementById('welcomeName').innerText = `Hola, ${name}`;
+            document.getElementById('studentAvatar').innerText = avatar;
+        }
+
+        function autoSaveDial(forceValue = null) {
+            const studentData = JSON.parse(localStorage.getItem('ia_student_data'));
+            if (!studentData) return;
+
+            const value = forceValue !== null ? forceValue : document.getElementById('mainDial').value;
+            const status = document.getElementById('saveStatus');
+            
+            status.innerText = 'Guardando...';
+            status.className = 'text-sm font-semibold text-blue-500';
+
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'save', name: studentData.name, avatar: studentData.avatar, value: value })
+            }).then(() => {
+                status.innerText = 'Guardado automáticamente ✅';
+                status.className = 'text-sm font-semibold text-green-600';
+            }).catch(() => {
+                status.innerText = 'Guardado localmente ✅';
+                status.className = 'text-sm font-semibold text-green-600';
+            });
+        }
+
+        function deleteStudent() {
+            if(!confirm('¿Estás seguro de que quieres borrar tus datos y volver a empezar?')) return;
+            const studentData = JSON.parse(localStorage.getItem('ia_student_data'));
+            if (studentData) {
+                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', name: studentData.name }) });
+            }
+            localStorage.removeItem('ia_student_data');
+            document.getElementById('studentName').value = '';
+            document.getElementById('mainDial').value = '50';
+            document.getElementById('dialSection').classList.add('hidden');
+            document.getElementById('dialSection').classList.remove('flex');
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('saveStatus').innerText = 'Mueve el dial para registrar tu respuesta';
+        }
+
+        // ==========================================
+        // LÓGICA DEL PROFESOR / ADMIN
+        // ==========================================
+        async function fetchAdminData() {
+            const list = document.getElementById('adminList');
+            list.innerHTML = '<p class="text-center text-gray-400 mt-10">Actualizando datos desde Drive... ⏳</p>';
+            
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
+                
+                // Actualizar interfaz de fase
+                globalPhase = parseInt(data.currentPhase);
+                document.getElementById('currentPhaseLabel').innerText = globalPhase === 1 ? 'Fase 1 (Antes)' : 'Fase 2 (Después)';
+                document.getElementById('btnFase1').classList.toggle('hidden', globalPhase === 1);
+                document.getElementById('btnFase2').classList.toggle('hidden', globalPhase === 2);
+
+                processAdminData(data.data);
+            } catch (error) {
+                list.innerHTML = '<p class="text-center text-red-500 mt-10">Error al conectar con Drive. Revisa tu SCRIPT_URL.</p>';
+            }
+        }
+
+        function changePhase(phase) {
+            if(!confirm(`¿Estás seguro de cambiar a la Fase ${phase}?`)) return;
+            
+            document.getElementById('currentPhaseLabel').innerText = 'Cambiando...';
+            
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'set_phase', phase: phase })
+            }).then(() => {
+                fetchAdminData(); // Recargar todo para mostrar el nuevo estado
+            });
+        }
+
+        function processAdminData(data) {
+            const students = {};
+            // Agrupar tomando el ÚLTIMO valor de cada fase
+            data.forEach(row => {
+                if (!students[row.name]) {
+                    students[row.name] = { name: row.name, avatar: row.avatar, valFase1: null, valFase2: null };
+                }
+                if (row.phase == 1) students[row.name].valFase1 = parseInt(row.value);
+                if (row.phase == 2) students[row.name].valFase2 = parseInt(row.value);
+            });
+
+            const list = document.getElementById('adminList');
+            list.innerHTML = '';
+            
+            let totalAntes = 0;
+            let totalDespues = 0;
+            let count = Object.keys(students).length;
+
+            if (count === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 mt-10">Nadie ha participado aún.</p>';
+                updateChart(0, 0);
+                return;
+            }
+
+            Object.values(students).forEach(s => {
+                // Si no han guardado en Fase 2, se asume que su postura no cambió respecto a la Fase 1
+                const antes = s.valFase1 !== null ? s.valFase1 : 50;
+                const despues = s.valFase2 !== null ? s.valFase2 : antes; 
+
+                totalAntes += antes;
+                totalDespues += despues;
+
+                list.innerHTML += `
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-3 border border-gray-100 flex items-center gap-4">
+                        <div class="text-3xl">${s.avatar}</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-700">${s.name}</h3>
+                            <div class="text-xs text-gray-500 mt-1">
+                                <div><span class="inline-block w-16 text-gray-400">Antes:</span> 
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1 mb-2 inline-block align-middle w-32">
+                                      <div class="bg-gray-400 h-1.5 rounded-full" style="width: ${antes}%"></div>
+                                    </div> ${antes}%
+                                </div>
+                                <div class="${s.valFase2 === null ? 'opacity-40' : ''}"><span class="inline-block w-16 text-indigo-500 font-bold">Después:</span> 
+                                    <div class="w-full bg-indigo-100 rounded-full h-1.5 mt-1 inline-block align-middle w-32">
+                                      <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${despues}%"></div>
+                                    </div> <span class="text-indigo-600 font-bold">${s.valFase2 === null ? 'Pendiente' : despues + '%'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            updateChart(totalAntes / count, totalDespues / count);
+        }
+
+        function updateChart(avgAntes, avgDespues) {
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            if (chartInstance) {
+                chartInstance.data.datasets[0].data = [avgAntes, avgDespues];
+                chartInstance.update();
+            } else {
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Antes de la charla', 'Después de la charla'],
+                        datasets: [{
+                            label: 'Cercanía Promedio (%)',
+                            data: [avgAntes, avgDespues],
+                            backgroundColor: ['#9ca3af', '#4f46e5'],
+                            borderRadius: 8
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
