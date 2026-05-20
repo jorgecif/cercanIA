@@ -20,7 +20,7 @@
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans p-4 md:p-8 min-h-screen flex items-center justify-center">
 
-    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-2xl shadow-xl border border-gray-100">
+    <div class="w-full max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-xl border border-gray-100">
         
         <!-- VISTA DEL ESTUDIANTE -->
         <div id="studentView" class="hidden">
@@ -48,7 +48,7 @@
                     </div>
                 </div>
 
-                <button onclick="deleteStudent()" class="text-red-500 hover:text-red-700 text-sm underline mt-8">Me equivoqué en mi nombre (Volver a empezar)</button>
+                <button id="deleteBtn" onclick="deleteStudent()" class="text-red-500 hover:text-red-700 text-sm underline mt-8">Me equivoqué en mi nombre (Volver a empezar)</button>
             </div>
         </div>
 
@@ -70,7 +70,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-6xl">
                 <!-- Lista de comparación -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 max-h-[500px] overflow-y-auto" id="adminList">
                     <p class="text-center text-gray-400 mt-10">Cargando datos...</p>
@@ -113,6 +113,15 @@
             if (savedData) {
                 const data = JSON.parse(savedData);
                 showDial(data.name, data.avatar);
+                
+                // Verificar en qué fase estamos silenciosamente al cargar
+                fetch(SCRIPT_URL)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.currentPhase == 2) {
+                            document.getElementById('deleteBtn').classList.add('hidden');
+                        }
+                    }).catch(() => {}); // Si falla la red, ignora
             }
         }
 
@@ -149,10 +158,18 @@
             fetch(SCRIPT_URL, {
                 method: 'POST',
                 body: JSON.stringify({ action: 'save', name: studentData.name, avatar: studentData.avatar, value: value })
-            }).then(() => {
+            })
+            .then(res => res.json())
+            .then(data => {
                 status.innerText = 'Guardado automáticamente ✅';
                 status.className = 'text-sm font-semibold text-green-600';
-            }).catch(() => {
+                
+                // Si al guardar, el servidor responde que ya estamos en Fase 2, oculta el botón
+                if (data.phase == 2) {
+                    document.getElementById('deleteBtn').classList.add('hidden');
+                }
+            })
+            .catch(() => {
                 status.innerText = 'Guardado localmente ✅';
                 status.className = 'text-sm font-semibold text-green-600';
             });
