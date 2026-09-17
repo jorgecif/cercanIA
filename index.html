@@ -62,9 +62,15 @@
                         <span id="dialMinLabel">Nada</span>
                         <span id="dialMaxLabel">Mucho</span>
                     </div>
-                    <input type="range" id="mainDial" min="0" max="100" value="50" onchange="autoSaveDial()">
-                    <div class="text-center mt-2 h-6">
-                        <span id="saveStatus" class="text-sm font-semibold text-gray-400">Mueve el dial para registrar tu respuesta</span>
+                    <!-- La marca gris es la respuesta de la pregunta anterior del par -->
+                    <div class="relative pt-4">
+                        <span id="dialReference" class="hidden absolute top-0 -translate-x-1/2 text-gray-400 leading-none">▼</span>
+                        <input type="range" id="mainDial" min="0" max="100" value="50" onchange="autoSaveDial()">
+                    </div>
+                    <div class="text-center mt-2 min-h-6 space-y-2">
+                        <p id="dialReferenceCaption" class="hidden text-xs text-gray-400"></p>
+                        <p><span id="saveStatus" class="text-sm font-semibold text-gray-400">Mueve el dial para registrar tu respuesta</span></p>
+                        <button id="sameAsBeforeBtn" onclick="keepPreviousAnswer()" class="hidden text-sm font-bold text-gray-600 underline hover:text-gray-800">Mi respuesta no cambió</button>
                     </div>
                 </div>
 
@@ -339,16 +345,46 @@
             document.getElementById('deleteBtn').classList.toggle('hidden', phase != 1);
 
             const saved = (getStudentData() || {}).values || {};
-            document.getElementById('mainDial').value = saved[phase] != null ? saved[phase] : 50;
+            // En las preguntas "después" (2 y 4) el dial arranca donde quedó la del par
+            const previous = previousAnswer(phase, saved);
+            const answered = saved[phase] != null;
+            document.getElementById('mainDial').value = answered ? saved[phase] : (previous != null ? previous : 50);
+            showReference(previous);
+            document.getElementById('sameAsBeforeBtn').classList.toggle('hidden', answered || previous == null);
 
             const status = document.getElementById('saveStatus');
-            if (saved[phase] != null) {
+            if (answered) {
                 status.innerText = 'Tu respuesta quedó guardada ✅';
                 status.className = 'text-sm font-semibold text-green-600';
+            } else if (previous != null) {
+                status.innerText = `Antes respondiste ${previous}%. Sube o baja el dial según lo que aprendiste`;
+                status.className = 'text-sm font-semibold text-gray-500';
             } else {
                 status.innerText = isNewQuestion ? '¡Nueva pregunta! Mueve el dial para responder' : 'Mueve el dial para registrar tu respuesta';
                 status.className = 'text-sm font-semibold text-gray-400';
             }
+        }
+
+        // La respuesta de la primera pregunta del par, si esta fase es la segunda
+        function previousAnswer(phase, saved) {
+            const pair = PAIRS.find(p => p.to == phase);
+            return pair && saved[pair.from] != null ? parseInt(saved[pair.from]) : null;
+        }
+
+        // Marca gris sobre el dial; el desplazamiento compensa el ancho del robot (40px)
+        function showReference(previous) {
+            const reference = document.getElementById('dialReference');
+            const caption = document.getElementById('dialReferenceCaption');
+            reference.classList.toggle('hidden', previous == null);
+            caption.classList.toggle('hidden', previous == null);
+            if (previous == null) return;
+            reference.style.left = `calc(${previous}% + ${(50 - previous) * 0.4}px)`;
+            caption.innerText = `La marca gris ▼ es tu respuesta anterior: ${previous}%`;
+        }
+
+        // Para quien no cambió de opinión: guarda el mismo valor de la pregunta anterior
+        function keepPreviousAnswer() {
+            autoSaveDial(document.getElementById('mainDial').value);
         }
 
         function autoSaveDial(forceValue = null) {
@@ -369,6 +405,7 @@
                 saveStudentData(studentData);
 
                 if (data.phase != studentPhase) return applyPhase(data.phase);
+                document.getElementById('sameAsBeforeBtn').classList.add('hidden');
                 status.innerText = 'Guardado automáticamente ✅';
                 status.className = 'text-sm font-semibold text-green-600';
             })

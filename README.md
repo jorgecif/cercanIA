@@ -48,5 +48,6 @@ Si más adelante cambias `Code.gs`: **Implementar → Gestionar implementaciones
 - La lista muestra las respuestas de cada participante y, cuando tiene las dos mediciones de un par, cuánto subió o bajó.
 - El promedio de cada fase cuenta solo a quienes respondieron esa pregunta.
 - Cada participante guarda una respuesta por fase, y al volver a una fase anterior ve la que ya había dado.
+- En las preguntas 2 y 4 el dial arranca donde el participante dejó la 1 o la 3, con una marca gris en ese valor, para que suba o baje a partir de lo aprendido. Si no cambió de opinión, "Mi respuesta no cambió" guarda el mismo valor.
 - Solo en la Fase 1 los estudiantes pueden borrar sus datos y volver a empezar.
 - **Nueva dinámica:** vuelve a Fase 1 y borra las filas de la hoja `Respuestas` (deja la cabecera).
