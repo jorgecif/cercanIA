@@ -15,6 +15,13 @@
         }
         input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 10px; background: #cbd5e1; border-radius: 5px; }
+        input[type=range]::-moz-range-thumb {
+            height: 40px; width: 40px; border: none; background-color: transparent;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 32 32"><text x="0" y="26" font-size="26">🤖</text></svg>') center/cover;
+            cursor: pointer; transition: transform 0.1s;
+        }
+        input[type=range]::-moz-range-thumb:hover { transform: scale(1.1); }
+        input[type=range]::-moz-range-track { width: 100%; height: 10px; background: #cbd5e1; border-radius: 5px; }
         input[type=range]:focus { outline: none; }
     </style>
 </head>
@@ -87,10 +94,27 @@
 
     <script>
         // --- CONFIGURACIÓN ---
+        // URL de la aplicación web de Apps Script (ver README.md)
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeW15YSvD3Xc72v6fL4QVEl606ze8igI0Uu0XWk-9LuKlwSJ1NLBV-PeQikHmn7JUAtA/exec'; // <--- PEGA TU URL DE APPS SCRIPT AQUÍ
         const avatars = ['🧑‍🚀', '👽', '👻', '🤠', '👾', '🐵', '🕵️', '🦸'];
         let chartInstance = null;
         let globalPhase = 1;
+
+        function escapeHtml(text) {
+            return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // Envía una acción al backend; lanza error si falla la red o el servidor la rechaza
+        async function postAction(payload) {
+            const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const data = await res.json();
+            if (data.ok === false) throw new Error(data.error);
+            return data;
+        }
+
+        function getStudentData() {
+            return JSON.parse(localStorage.getItem('ia_student_data'));
+        }
 
         // --- ENRUTAMIENTO ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -109,16 +133,16 @@
         // LÓGICA DEL ESTUDIANTE
         // ==========================================
         function checkExistingSession() {
-            const savedData = localStorage.getItem('ia_student_data');
-            if (savedData) {
-                const data = JSON.parse(savedData);
+            const data = getStudentData();
+            if (data && data.clientId) {
                 showDial(data.name, data.avatar);
+                if (data.lastValue != null) document.getElementById('mainDial').value = data.lastValue;
                 
                 // Verificar en qué fase estamos silenciosamente al cargar
                 fetch(SCRIPT_URL)
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.currentPhase == 2) {
+                    .then(server => {
+                        if (server.currentPhase == 2) {
                             document.getElementById('deleteBtn').classList.add('hidden');
                         }
                     }).catch(() => {}); // Si falla la red, ignora
@@ -130,7 +154,7 @@
             if (!name) return alert('Por favor ingresa tu nombre');
             
             const avatar = avatars[Math.floor(Math.random() * avatars.length)];
-            const studentData = { name, avatar };
+            const studentData = { clientId: crypto.randomUUID(), name, avatar };
             
             localStorage.setItem('ia_student_data', JSON.stringify(studentData));
             showDial(name, avatar);
@@ -146,7 +170,7 @@
         }
 
         function autoSaveDial(forceValue = null) {
-            const studentData = JSON.parse(localStorage.getItem('ia_student_data'));
+            const studentData = getStudentData();
             if (!studentData) return;
 
             const value = forceValue !== null ? forceValue : document.getElementById('mainDial').value;
@@ -155,12 +179,10 @@
             status.innerText = 'Guardando...';
             status.className = 'text-sm font-semibold text-blue-500';
 
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'save', name: studentData.name, avatar: studentData.avatar, value: value })
-            })
-            .then(res => res.json())
+            postAction({ action: 'save', clientId: studentData.clientId, name: studentData.name, avatar: studentData.avatar, value: value })
             .then(data => {
+                studentData.lastValue = value;
+                localStorage.setItem('ia_student_data', JSON.stringify(studentData));
                 status.innerText = 'Guardado automáticamente ✅';
                 status.className = 'text-sm font-semibold text-green-600';
                 
@@ -170,16 +192,22 @@
                 }
             })
             .catch(() => {
-                status.innerText = 'Guardado localmente ✅';
-                status.className = 'text-sm font-semibold text-green-600';
+                status.innerText = 'No se pudo guardar ❌ Revisa tu conexión y mueve el dial de nuevo';
+                status.className = 'text-sm font-semibold text-red-600';
             });
         }
 
-        function deleteStudent() {
+        async function deleteStudent() {
             if(!confirm('¿Estás seguro de que quieres borrar tus datos y volver a empezar?')) return;
-            const studentData = JSON.parse(localStorage.getItem('ia_student_data'));
+            const studentData = getStudentData();
             if (studentData) {
-                fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', name: studentData.name }) });
+                try {
+                    await postAction({ action: 'delete', clientId: studentData.clientId, name: studentData.name });
+                } catch (err) {
+                    return alert(err.message === 'phase_locked'
+                        ? 'La Fase 2 ya empezó: ya no se pueden borrar los datos.'
+                        : 'No se pudieron borrar tus datos. Revisa tu conexión e inténtalo de nuevo.');
+                }
             }
             localStorage.removeItem('ia_student_data');
             document.getElementById('studentName').value = '';
@@ -216,25 +244,33 @@
         function changePhase(phase) {
             if(!confirm(`¿Estás seguro de cambiar a la Fase ${phase}?`)) return;
             
+            // La clave se recuerda solo en esta pestaña
+            const adminKey = sessionStorage.getItem('ia_admin_key') || prompt('Clave del profesor (ADMIN_KEY):');
+            if (!adminKey) return;
+
             document.getElementById('currentPhaseLabel').innerText = 'Cambiando...';
-            
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'set_phase', phase: phase })
-            }).then(() => {
+
+            postAction({ action: 'set_phase', phase: phase, adminKey: adminKey })
+            .then(() => {
+                sessionStorage.setItem('ia_admin_key', adminKey);
                 fetchAdminData(); // Recargar todo para mostrar el nuevo estado
+            })
+            .catch(err => {
+                sessionStorage.removeItem('ia_admin_key');
+                alert(err.message === 'unauthorized' ? 'Clave incorrecta.' : 'No se pudo cambiar la fase. Inténtalo de nuevo.');
+                fetchAdminData();
             });
         }
 
         function processAdminData(data) {
             const students = {};
-            // Agrupar tomando el ÚLTIMO valor de cada fase
+            // Agrupar por dispositivo, con un valor por fase
             data.forEach(row => {
-                if (!students[row.name]) {
-                    students[row.name] = { name: row.name, avatar: row.avatar, valFase1: null, valFase2: null };
+                if (!students[row.clientId]) {
+                    students[row.clientId] = { name: row.name, avatar: row.avatar, valFase1: null, valFase2: null };
                 }
-                if (row.phase == 1) students[row.name].valFase1 = parseInt(row.value);
-                if (row.phase == 2) students[row.name].valFase2 = parseInt(row.value);
+                if (row.phase == 1) students[row.clientId].valFase1 = parseInt(row.value);
+                if (row.phase == 2) students[row.clientId].valFase2 = parseInt(row.value);
             });
 
             const list = document.getElementById('adminList');
@@ -260,9 +296,9 @@
 
                 list.innerHTML += `
                     <div class="bg-white p-4 rounded-lg shadow-sm mb-3 border border-gray-100 flex items-center gap-4">
-                        <div class="text-3xl">${s.avatar}</div>
+                        <div class="text-3xl">${escapeHtml(s.avatar)}</div>
                         <div class="flex-1">
-                            <h3 class="font-bold text-gray-700">${s.name}</h3>
+                            <h3 class="font-bold text-gray-700">${escapeHtml(s.name)}</h3>
                             <div class="text-xs text-gray-500 mt-1">
                                 <div><span class="inline-block w-16 text-gray-400">Antes:</span> 
                                     <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1 mb-2 inline-block align-middle w-32">
