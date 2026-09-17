@@ -43,6 +43,7 @@ Si más adelante cambias `Code.gs`: **Implementar → Gestionar implementaciones
 - **Volver semanas después:** en la pantalla de entrada, "Ya participé antes y tengo mi código" recupera sus respuestas, incluso desde otro teléfono. Conviene pedirles que lo anoten o lo fotografíen el primer día.
 - **Profesor:** `https://<usuario>.github.io/cercanIA/?view=admin` (o doble clic en el título). Al entrar se pide la `ADMIN_KEY`, que se recuerda mientras la pestaña esté abierta.
 - El profesor cambia de fase con los botones **1. Uso · antes / 2. Uso · después / 3. Confianza · inicio / 4. Confianza · final**. La pregunta les cambia sola a los estudiantes en menos de 30 segundos, sin recargar.
+- Arriba del tablero, un **contador** dice cuántos participantes respondieron la fase en curso ("3 de 4"), cuántos faltan y una barra de avance. Sirve para decidir cuándo cambiar de fase. El tablero se actualiza solo cada 15 segundos.
 - Con **Comparar** elige qué fases muestra el gráfico, y con **👀 Mostrar a los estudiantes** hace que ellos vean esa misma comparación en su propio teléfono. Lo que se comparte son solo promedios, nunca nombres.
 - La lista muestra las respuestas de cada participante y, cuando tiene las dos mediciones de un par, cuánto subió o bajó.
 - El promedio de cada fase cuenta solo a quienes respondieron esa pregunta.

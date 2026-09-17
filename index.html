@@ -109,6 +109,23 @@
                 </div>
             </div>
 
+            <!-- Cuántos han respondido la fase en curso -->
+            <div class="w-full max-w-6xl mb-6 bg-white p-4 rounded-xl border-2 border-indigo-100">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <p class="font-bold text-gray-700">
+                        <span id="counterAnswered" class="text-3xl text-indigo-600">0</span>
+                        <span class="text-gray-400">de</span>
+                        <span id="counterTotal" class="text-xl">0</span>
+                        <span id="counterPhase" class="text-sm font-normal text-gray-500">participantes respondieron esta fase</span>
+                    </p>
+                    <p id="counterPending" class="text-sm font-semibold text-gray-500"></p>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5 mt-2">
+                    <div id="counterBar" class="bg-indigo-500 h-2.5 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+                <p id="counterUpdated" class="text-xs text-gray-400 mt-2"></p>
+            </div>
+
             <div class="flex flex-wrap gap-3 items-center justify-center mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <span class="text-sm text-gray-500">Comparar:</span>
                 <div id="comparisonButtons" class="flex flex-wrap gap-2 justify-center"></div>
@@ -168,6 +185,7 @@
         const comparisonPhases = key => comparisonInfo(key).pairs.flatMap(pair => [pair.from, pair.to]);
 
         let adminChart = null;
+        let adminTimer = null;
         let studentChart = null;
         let globalPhase = 1;
         let studentPhase = null;
@@ -421,6 +439,7 @@
             document.getElementById('adminView').classList.remove('hidden');
             document.body.classList.remove('flex', 'items-center');
             fetchAdminData();
+            if (!adminTimer) adminTimer = setInterval(() => fetchAdminData(true), 15000);
         }
 
         async function adminLogin(event) {
@@ -444,9 +463,11 @@
             }
         }
 
-        async function fetchAdminData() {
+        // `quiet` es la recarga automática: no borra la lista ni pierde el scroll
+        async function fetchAdminData(quiet = false) {
             const list = document.getElementById('adminList');
-            list.innerHTML = '<p class="text-center text-gray-400 mt-10">Actualizando datos desde Drive... ⏳</p>';
+            if (!quiet) list.innerHTML = '<p class="text-center text-gray-400 mt-10">Actualizando datos desde Drive... ⏳</p>';
+            const scroll = list.scrollTop;
 
             try {
                 const data = await postAction({ action: 'list', adminKey: sessionStorage.getItem('ia_admin_key') });
@@ -461,10 +482,31 @@
                 updateResultsButton();
 
                 processAdminData(data.data);
+                list.scrollTop = scroll;
+                document.getElementById('counterUpdated').innerText = `Actualizado a las ${new Date().toLocaleTimeString('es-CO')} · se actualiza solo cada 15 segundos`;
             } catch (error) {
                 if (error.message === 'unauthorized') return showAdminLogin('La clave ya no es válida.');
                 list.innerHTML = '<p class="text-center text-red-500 mt-10">Error al conectar con Drive. Revisa tu SCRIPT_URL.</p>';
             }
+        }
+
+        // Cuántos respondieron la fase en curso, para saber cuándo cambiar de fase
+        function updateCounter(people) {
+            const answered = people.filter(s => s.values[globalPhase] != null).length;
+            const total = people.length;
+            const pending = total - answered;
+
+            document.getElementById('counterAnswered').innerText = answered;
+            document.getElementById('counterTotal').innerText = total;
+            document.getElementById('counterPhase').innerText = `participantes respondieron la Fase ${globalPhase}`;
+            document.getElementById('counterBar').style.width = `${total ? (answered / total) * 100 : 0}%`;
+            document.getElementById('counterPending').innerText = total === 0
+                ? 'Nadie ha entrado aún'
+                : pending === 0 ? '¡Todos respondieron! Puedes cambiar de fase'
+                : pending === 1 ? 'Falta 1' : `Faltan ${pending}`;
+            document.getElementById('counterPending').className = pending === 0 && total > 0
+                ? 'text-sm font-bold text-green-600'
+                : 'text-sm font-semibold text-gray-500';
         }
 
         // Un botón por fase; el de la fase en curso queda marcado
@@ -537,6 +579,7 @@
             const people = Object.values(students);
             const view = comparisonInfo(resultsView);
             document.getElementById('chartTitle').innerText = view.title;
+            updateCounter(people);
 
             if (people.length === 0) {
                 list.innerHTML = '<p class="text-center text-gray-400 mt-10">Nadie ha participado aún.</p>';
