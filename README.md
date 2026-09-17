@@ -12,6 +12,8 @@ Las cuatro fases, en el orden de la dinámica:
 | 3 | Inicio del curso | ¿Qué tan seguro te sientes usando la IA? | Nada seguro — Muy seguro |
 | 4 | Final del curso | ¿Qué tan seguro te sientes usando la IA? | Nada seguro — Muy seguro |
 
+Los estudiantes no ven los momentos ("antes", "después"): solo un número grande, "Pregunta 1 de 4", con la pregunta debajo. Los momentos son para el profesor.
+
 Las comparaciones que el profesor puede mostrar son **Uso (fases 1 y 2)**, **Confianza (fases 3 y 4)** y **las cuatro juntas**.
 
 Las preguntas están en las listas `PHASES`, `PAIRS` y `COMPARISONS`, al principio del `<script>` de `index.html`. Para cambiar un texto o añadir otra fase, edita esas listas y, si añades fases, la lista `TOTAL_PHASES` de `apps-script/Code.gs`.

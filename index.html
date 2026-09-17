@@ -50,7 +50,11 @@
             <div id="dialSection" class="hidden flex-col items-center py-8 space-y-8">
                 <div class="text-6xl bg-indigo-50 p-6 rounded-full border-4 border-indigo-100 shadow-inner" id="studentAvatar">🧑‍🚀</div>
                 <h2 class="text-2xl font-bold text-gray-700" id="welcomeName">Hola, </h2>
-                <p id="dialMoment" class="text-xs font-bold uppercase tracking-wide text-indigo-400 -mb-6"></p>
+                <div class="flex flex-col items-center -mb-4">
+                    <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Pregunta</span>
+                    <span id="dialPhaseNumber" class="text-7xl md:text-8xl font-black text-indigo-600 leading-none">1</span>
+                    <span id="dialPhaseOf" class="text-xs font-bold text-gray-400">de 4</span>
+                </div>
                 <p id="dialQuestion" class="text-center text-gray-600 text-lg font-semibold"></p>
 
                 <div class="w-full max-w-lg space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
@@ -149,11 +153,14 @@
             { label: 'Uso de la IA', from: 1, to: 2 },
             { label: 'Confianza al usar la IA', from: 3, to: 4 }
         ];
+        // `title` es lo que ve el profesor; `studentTitle`, lo que ven los estudiantes
         const COMPARISONS = [
-            { key: 'uso', button: 'Uso (1 y 2)', title: 'Uso de la IA: antes y después de la charla', pairs: [PAIRS[0]] },
-            { key: 'confianza', button: 'Confianza (3 y 4)', title: 'Confianza: inicio y final del curso', pairs: [PAIRS[1]] },
-            { key: 'todas', button: 'Las cuatro', title: 'Las cuatro fases', pairs: PAIRS }
+            { key: 'uso', button: 'Uso (1 y 2)', title: 'Uso de la IA: antes y después de la charla', studentTitle: 'Resultados de las preguntas 1 y 2', pairs: [PAIRS[0]] },
+            { key: 'confianza', button: 'Confianza (3 y 4)', title: 'Confianza: inicio y final del curso', studentTitle: 'Resultados de las preguntas 3 y 4', pairs: [PAIRS[1]] },
+            { key: 'todas', button: 'Las cuatro', title: 'Las cuatro fases', studentTitle: 'Resultados de las cuatro preguntas', pairs: PAIRS }
         ];
+        // A los estudiantes las fases se les nombran solo por su número
+        PHASES.forEach(p => { p.label = `Pregunta ${p.phase}`; });
 
         const phaseInfo = phase => PHASES.find(p => p.phase == phase) || PHASES[0];
         const comparisonInfo = key => COMPARISONS.find(c => c.key === key) || COMPARISONS[0];
@@ -305,7 +312,9 @@
             const info = phaseInfo(phase);
             document.getElementById('studentTitle').innerText = info.question;
             document.getElementById('dialQuestion').innerText = info.question;
-            document.getElementById('dialMoment').innerText = info.moment;
+            // Los estudiantes ven la fase solo como un número grande, no como "antes" o "después"
+            document.getElementById('dialPhaseNumber').innerText = info.phase;
+            document.getElementById('dialPhaseOf').innerText = `de ${PHASES.length}`;
             document.getElementById('dialMinLabel').innerText = info.min;
             document.getElementById('dialMaxLabel').innerText = info.max;
             // Solo se puede volver a empezar en la primera fase
@@ -390,8 +399,8 @@
             }
             box.classList.remove('hidden');
             const view = comparisonInfo(server.resultsView);
-            document.getElementById('studentResultsTitle').innerText = view.title;
-            studentChart = drawChart('studentChart', studentChart, view.key, server.averages);
+            document.getElementById('studentResultsTitle').innerText = view.studentTitle;
+            studentChart = drawChart('studentChart', studentChart, view.key, server.averages, 'label');
         }
 
         // ==========================================
@@ -582,9 +591,9 @@
         }
 
         // Dibuja (o actualiza) un gráfico de barras con las fases de la comparación
-        function drawChart(canvasId, chart, comparisonKey, averages) {
+        function drawChart(canvasId, chart, comparisonKey, averages, labelField = 'short') {
             const phases = comparisonPhases(comparisonKey);
-            const labels = phases.map(phase => phaseInfo(phase).short);
+            const labels = phases.map(phase => phaseInfo(phase)[labelField]);
             const values = phases.map(phase => averages[phase] || 0);
             const colors = phases.map(phase => phaseInfo(phase).color);
 
