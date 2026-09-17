@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cercanía a la IA</title>
+    <title>cercanIA · Dinámica en vivo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -31,23 +31,32 @@
         
         <!-- VISTA DEL ESTUDIANTE -->
         <div id="studentView" class="hidden">
-            <h1 ondblclick="window.location.href='?view=admin'" class="text-2xl md:text-3xl font-bold text-center mb-2 text-indigo-700 cursor-default select-none">Tu relación con la IA</h1>
+            <h1 id="studentTitle" ondblclick="window.location.href='?view=admin'" class="text-2xl md:text-3xl font-bold text-center mb-2 text-indigo-700 cursor-default select-none">Tu relación con la IA</h1>
             
             <div id="loginSection" class="flex flex-col items-center justify-center py-10 space-y-4">
-                <p class="text-gray-500 mb-4 text-center">Ingresa tu nombre para participar en la dinámica.</p>
+                <p class="text-gray-500 mb-4 text-center">Ingresa tu nombre y elige tu avatar para participar en la dinámica.</p>
                 <input type="text" id="studentName" placeholder="Ej. Juan Pérez" class="px-4 py-3 border-2 rounded-lg w-full max-w-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-center text-lg">
+                <div id="avatarPicker" class="flex flex-wrap justify-center gap-2 max-w-sm"></div>
                 <button onclick="startStudent()" class="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition w-full max-w-sm">Entrar al tablero</button>
+
+                <button type="button" onclick="toggleCodeForm()" class="text-indigo-600 hover:text-indigo-800 text-sm underline">Ya participé antes y tengo mi código</button>
+                <form id="codeForm" onsubmit="recoverStudent(event)" class="hidden flex-col items-center gap-3 w-full max-w-sm">
+                    <input type="text" id="codeInput" placeholder="Ej. K7MPQ" autocapitalize="characters" class="px-4 py-3 border-2 rounded-lg w-full focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-center text-lg font-mono uppercase">
+                    <button type="submit" class="bg-gray-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-800 transition w-full">Recuperar mis respuestas</button>
+                    <p id="codeError" class="text-sm font-semibold text-red-600 text-center"></p>
+                </form>
             </div>
 
             <div id="dialSection" class="hidden flex-col items-center py-8 space-y-8">
                 <div class="text-6xl bg-indigo-50 p-6 rounded-full border-4 border-indigo-100 shadow-inner" id="studentAvatar">🧑‍🚀</div>
                 <h2 class="text-2xl font-bold text-gray-700" id="welcomeName">Hola, </h2>
-                <p class="text-center text-gray-600">Mueve el dial para indicar qué tan cerca o lejos te sientes de la Inteligencia Artificial en tu día a día.</p>
-                
+                <p id="dialMoment" class="text-xs font-bold uppercase tracking-wide text-indigo-400 -mb-6"></p>
+                <p id="dialQuestion" class="text-center text-gray-600 text-lg font-semibold"></p>
+
                 <div class="w-full max-w-lg space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
                     <div class="flex justify-between text-sm font-bold text-gray-500">
-                        <span>Muy lejos</span>
-                        <span>Muy cerca</span>
+                        <span id="dialMinLabel">Nada</span>
+                        <span id="dialMaxLabel">Mucho</span>
                     </div>
                     <input type="range" id="mainDial" min="0" max="100" value="50" onchange="autoSaveDial()">
                     <div class="text-center mt-2 h-6">
@@ -55,9 +64,29 @@
                     </div>
                 </div>
 
+                <!-- Resultados, solo cuando el profesor los habilita -->
+                <div id="studentResults" class="hidden w-full max-w-lg bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <h3 id="studentResultsTitle" class="text-center font-bold text-gray-700 mb-3"></h3>
+                    <canvas id="studentChart" width="400" height="260"></canvas>
+                </div>
+
+                <p class="text-sm text-gray-500 text-center">
+                    Tu código: <span id="studentCode" class="font-mono font-bold text-indigo-700 text-base"></span><br>
+                    Guárdalo para volver a entrar al final del curso, aunque cambies de teléfono.
+                </p>
+
                 <button id="deleteBtn" onclick="deleteStudent()" class="text-red-500 hover:text-red-700 text-sm underline mt-8">Me equivoqué en mi nombre (Volver a empezar)</button>
             </div>
         </div>
+
+        <!-- ACCESO DEL PROFESOR -->
+        <form id="adminLogin" onsubmit="adminLogin(event)" class="hidden flex-col items-center justify-center py-10 space-y-4">
+            <h1 class="text-2xl md:text-3xl font-bold text-center text-indigo-700">Acceso del profesor</h1>
+            <p class="text-gray-500 text-center">Ingresa la clave para ver el tablero.</p>
+            <input type="password" id="adminKeyInput" placeholder="Clave" autocomplete="current-password" class="px-4 py-3 border-2 rounded-lg w-full max-w-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none text-center text-lg">
+            <button type="submit" id="adminLoginBtn" class="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition w-full max-w-sm">Entrar</button>
+            <p id="adminLoginError" class="text-sm font-semibold text-red-600 h-5"></p>
+        </form>
 
         <!-- VISTA DEL PROFESOR / DASHBOARD -->
         <div id="adminView" class="hidden flex flex-col items-center w-full">
@@ -69,12 +98,17 @@
                     <div class="text-sm">
                         Estado: <span id="currentPhaseLabel" class="font-bold text-indigo-700 bg-white px-2 py-1 rounded">Cargando...</span>
                     </div>
-                    <button id="btnFase1" onclick="changePhase(1)" class="hidden bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm font-bold">Volver a Fase 1</button>
-                    <button id="btnFase2" onclick="changePhase(2)" class="hidden bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm font-bold shadow-md animate-pulse">¡Habilitar Fase 2!</button>
+                    <div id="phaseButtons" class="flex flex-wrap gap-2 justify-center"></div>
                     <button onclick="fetchAdminData()" class="bg-indigo-600 text-white px-4 py-1.5 rounded hover:bg-indigo-700 text-sm font-bold flex gap-2 items-center ml-2">
                         <span>🔄</span> Actualizar
                     </button>
                 </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center justify-center mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <span class="text-sm text-gray-500">Comparar:</span>
+                <div id="comparisonButtons" class="flex flex-wrap gap-2 justify-center"></div>
+                <button id="toggleResultsBtn" onclick="toggleResults()" class="px-3 py-1 rounded text-sm font-bold bg-white text-gray-600 border-2 border-gray-300 hover:bg-gray-100">👀 Mostrar a los estudiantes</button>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-6xl">
@@ -85,7 +119,7 @@
 
                 <!-- Gráfico Agregado -->
                 <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center">
-                    <h2 class="text-xl font-bold mb-4 text-gray-700">Comparación General Promedio</h2>
+                    <h2 id="chartTitle" class="text-xl font-bold mb-4 text-gray-700 text-center">Promedio por fase</h2>
                     <canvas id="adminChart" width="400" height="300"></canvas>
                 </div>
             </div>
@@ -95,10 +129,44 @@
     <script>
         // --- CONFIGURACIÓN ---
         // URL de la aplicación web de Apps Script (ver README.md)
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxA7fIwbZZmTClJzHyxiovi6staY_A_M4HU-aTJmiYD94_pr_7PnVKLtlWboqBNxbY1ag/exec'; // <--- PEGA TU URL DE APPS SCRIPT AQUÍ
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9qSwiXkzBdW22BhlXrPzvz9073S_6KS-lJFE6CPtLZ7lbu3-joUyWbmJqkDTZ96E1NA/exec'; // <--- PEGA TU URL DE APPS SCRIPT AQUÍ
         const avatars = ['🧑‍🚀', '👽', '👻', '🤠', '👾', '🐵', '🕵️', '🦸'];
-        let chartInstance = null;
+
+        // Las cuatro fases de la dinámica, cada una con su pregunta.
+        // Para cambiar un texto o añadir otra fase, edita estas listas (y TOTAL_PHASES en Code.gs).
+        const PRIMERA = '#9ca3af';
+        const SEGUNDA = '#4f46e5';
+        const USO = { question: '¿Qué tanto has usado la IA hoy?', min: 'Nada', max: 'Todo el día' };
+        const CONFIANZA = { question: '¿Qué tan seguro te sientes usando la IA?', min: 'Nada seguro', max: 'Muy seguro' };
+        const PHASES = [
+            { phase: 1, short: 'Uso · antes', moment: 'Antes de la charla', color: PRIMERA, ...USO },
+            { phase: 2, short: 'Uso · después', moment: 'Después de la charla', color: SEGUNDA, ...USO },
+            { phase: 3, short: 'Confianza · inicio', moment: 'Inicio del curso', color: PRIMERA, ...CONFIANZA },
+            { phase: 4, short: 'Confianza · final', moment: 'Final del curso', color: SEGUNDA, ...CONFIANZA }
+        ];
+        // Cada par es una medición que se compara consigo misma: primera vs. segunda
+        const PAIRS = [
+            { label: 'Uso de la IA', from: 1, to: 2 },
+            { label: 'Confianza al usar la IA', from: 3, to: 4 }
+        ];
+        const COMPARISONS = [
+            { key: 'uso', button: 'Uso (1 y 2)', title: 'Uso de la IA: antes y después de la charla', pairs: [PAIRS[0]] },
+            { key: 'confianza', button: 'Confianza (3 y 4)', title: 'Confianza: inicio y final del curso', pairs: [PAIRS[1]] },
+            { key: 'todas', button: 'Las cuatro', title: 'Las cuatro fases', pairs: PAIRS }
+        ];
+
+        const phaseInfo = phase => PHASES.find(p => p.phase == phase) || PHASES[0];
+        const comparisonInfo = key => COMPARISONS.find(c => c.key === key) || COMPARISONS[0];
+        // Las fases que entran en una comparación, en orden
+        const comparisonPhases = key => comparisonInfo(key).pairs.flatMap(pair => [pair.from, pair.to]);
+
+        let adminChart = null;
+        let studentChart = null;
         let globalPhase = 1;
+        let studentPhase = null;
+        let showResults = false;
+        let resultsView = COMPARISONS[0].key;
+        let selectedAvatar = avatars[0];
 
         function escapeHtml(text) {
             return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -116,14 +184,24 @@
             return JSON.parse(localStorage.getItem('ia_student_data'));
         }
 
+        function saveStudentData(data) {
+            localStorage.setItem('ia_student_data', JSON.stringify(data));
+        }
+
+        // Código personal: sin letras ni números que se confundan al leerlos en voz alta
+        const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        function newCode() {
+            return Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+        }
+
         // --- ENRUTAMIENTO ---
         const urlParams = new URLSearchParams(window.location.search);
         const isAdmin = urlParams.get('view') === 'admin';
 
         if (isAdmin) {
-            document.getElementById('adminView').classList.remove('hidden');
-            document.body.classList.remove('flex', 'items-center'); 
-            fetchAdminData();
+            // La clave se recuerda solo en esta pestaña
+            if (sessionStorage.getItem('ia_admin_key')) showAdminView();
+            else showAdminLogin('');
         } else {
             document.getElementById('studentView').classList.remove('hidden');
             checkExistingSession();
@@ -132,41 +210,118 @@
         // ==========================================
         // LÓGICA DEL ESTUDIANTE
         // ==========================================
+        // Pinta los avatares para elegir; el primero queda seleccionado
+        function buildAvatarPicker() {
+            const picker = document.getElementById('avatarPicker');
+            picker.innerHTML = avatars.map((avatar, i) => `
+                <button type="button" onclick="selectAvatar(${i})" data-avatar="${avatar}"
+                    class="text-3xl p-2 rounded-xl border-2 transition ${i === 0 ? 'border-indigo-500 bg-indigo-50' : 'border-transparent hover:bg-gray-100'}">${avatar}</button>
+            `).join('');
+        }
+
+        function selectAvatar(index) {
+            selectedAvatar = avatars[index];
+            document.querySelectorAll('#avatarPicker button').forEach((button, i) => {
+                button.className = `text-3xl p-2 rounded-xl border-2 transition ${i === index ? 'border-indigo-500 bg-indigo-50' : 'border-transparent hover:bg-gray-100'}`;
+            });
+        }
+
         function checkExistingSession() {
-            const data = getStudentData();
-            if (data && data.clientId) {
-                showDial(data.name, data.avatar);
-                if (data.lastValue != null) document.getElementById('mainDial').value = data.lastValue;
-                
-                // Verificar en qué fase estamos silenciosamente al cargar
-                fetch(SCRIPT_URL)
-                    .then(res => res.json())
-                    .then(server => {
-                        if (server.currentPhase == 2) {
-                            document.getElementById('deleteBtn').classList.add('hidden');
-                        }
-                    }).catch(() => {}); // Si falla la red, ignora
+            buildAvatarPicker();
+            if (getStudentData()) {
+                showDial();
+                checkPhase();
+                setInterval(checkPhase, 30000);
             }
         }
 
         function startStudent() {
             const name = document.getElementById('studentName').value.trim();
             if (!name) return alert('Por favor ingresa tu nombre');
-            
-            const avatar = avatars[Math.floor(Math.random() * avatars.length)];
-            const studentData = { clientId: crypto.randomUUID(), name, avatar };
-            
-            localStorage.setItem('ia_student_data', JSON.stringify(studentData));
-            showDial(name, avatar);
+
+            saveStudentData({ code: newCode(), name, avatar: selectedAvatar, values: {} });
+            showDial();
             autoSaveDial(50);
+            setInterval(checkPhase, 30000);
         }
 
-        function showDial(name, avatar) {
+        // Recupera las respuestas de otro día u otro dispositivo con el código personal
+        async function recoverStudent(event) {
+            event.preventDefault();
+            const code = document.getElementById('codeInput').value.trim().toUpperCase();
+            const error = document.getElementById('codeError');
+            if (!code) return;
+
+            error.innerText = 'Buscando...';
+            try {
+                const found = await postAction({ action: 'find', code: code });
+                if (!found.found) {
+                    error.innerText = 'No encontramos ese código. Revísalo o entra con tu nombre.';
+                    return;
+                }
+                saveStudentData({ code: code, name: found.name, avatar: found.avatar, values: found.values });
+                error.innerText = '';
+                studentPhase = null;
+                showDial();
+                checkPhase();
+                setInterval(checkPhase, 30000);
+            } catch (err) {
+                error.innerText = 'No se pudo conectar. Inténtalo de nuevo.';
+            }
+        }
+
+        function toggleCodeForm() {
+            document.getElementById('codeForm').classList.toggle('hidden');
+            document.getElementById('codeInput').focus();
+        }
+
+        function showDial() {
+            const data = getStudentData();
             document.getElementById('loginSection').classList.add('hidden');
             document.getElementById('dialSection').classList.remove('hidden');
             document.getElementById('dialSection').classList.add('flex');
-            document.getElementById('welcomeName').innerText = `Hola, ${name}`;
-            document.getElementById('studentAvatar').innerText = avatar;
+            document.getElementById('welcomeName').innerText = `Hola, ${data.name}`;
+            document.getElementById('studentAvatar').innerText = data.avatar;
+            document.getElementById('studentCode').innerText = data.code;
+        }
+
+        // Consulta la fase y los resultados; si falla la red, deja la pantalla como está
+        function checkPhase() {
+            fetch(SCRIPT_URL)
+                .then(res => res.json())
+                .then(server => {
+                    applyPhase(server.currentPhase);
+                    renderStudentResults(server);
+                })
+                .catch(() => {});
+        }
+
+        // Muestra la pregunta de la fase y el valor que el participante ya respondió en ella
+        function applyPhase(phase) {
+            if (phase == studentPhase) return;
+            const isNewQuestion = studentPhase !== null;
+            studentPhase = phase;
+
+            const info = phaseInfo(phase);
+            document.getElementById('studentTitle').innerText = info.question;
+            document.getElementById('dialQuestion').innerText = info.question;
+            document.getElementById('dialMoment').innerText = info.moment;
+            document.getElementById('dialMinLabel').innerText = info.min;
+            document.getElementById('dialMaxLabel').innerText = info.max;
+            // Solo se puede volver a empezar en la primera fase
+            document.getElementById('deleteBtn').classList.toggle('hidden', phase != 1);
+
+            const saved = (getStudentData() || {}).values || {};
+            document.getElementById('mainDial').value = saved[phase] != null ? saved[phase] : 50;
+
+            const status = document.getElementById('saveStatus');
+            if (saved[phase] != null) {
+                status.innerText = 'Tu respuesta quedó guardada ✅';
+                status.className = 'text-sm font-semibold text-green-600';
+            } else {
+                status.innerText = isNewQuestion ? '¡Nueva pregunta! Mueve el dial para responder' : 'Mueve el dial para registrar tu respuesta';
+                status.className = 'text-sm font-semibold text-gray-400';
+            }
         }
 
         function autoSaveDial(forceValue = null) {
@@ -175,23 +330,29 @@
 
             const value = forceValue !== null ? forceValue : document.getElementById('mainDial').value;
             const status = document.getElementById('saveStatus');
-            
+
             status.innerText = 'Guardando...';
             status.className = 'text-sm font-semibold text-blue-500';
 
-            postAction({ action: 'save', clientId: studentData.clientId, name: studentData.name, avatar: studentData.avatar, value: value })
+            postAction({ action: 'save', code: studentData.code, name: studentData.name, avatar: studentData.avatar, value: value })
             .then(data => {
-                studentData.lastValue = value;
-                localStorage.setItem('ia_student_data', JSON.stringify(studentData));
+                // El servidor decide en qué fase quedó guardada la respuesta
+                studentData.values = studentData.values || {};
+                studentData.values[data.phase] = value;
+                saveStudentData(studentData);
+
+                if (data.phase != studentPhase) return applyPhase(data.phase);
                 status.innerText = 'Guardado automáticamente ✅';
                 status.className = 'text-sm font-semibold text-green-600';
-                
-                // Si al guardar, el servidor responde que ya estamos en Fase 2, oculta el botón
-                if (data.phase == 2) {
-                    document.getElementById('deleteBtn').classList.add('hidden');
-                }
             })
-            .catch(() => {
+            .catch(err => {
+                if (err.message === 'code_taken') {
+                    // Choque de códigos (muy raro): se asigna otro y se reintenta
+                    studentData.code = newCode();
+                    saveStudentData(studentData);
+                    document.getElementById('studentCode').innerText = studentData.code;
+                    return autoSaveDial(value);
+                }
                 status.innerText = 'No se pudo guardar ❌ Revisa tu conexión y mueve el dial de nuevo';
                 status.className = 'text-sm font-semibold text-red-600';
             });
@@ -202,143 +363,243 @@
             const studentData = getStudentData();
             if (studentData) {
                 try {
-                    await postAction({ action: 'delete', clientId: studentData.clientId, name: studentData.name });
+                    await postAction({ action: 'delete', code: studentData.code });
                 } catch (err) {
                     return alert(err.message === 'phase_locked'
-                        ? 'La Fase 2 ya empezó: ya no se pueden borrar los datos.'
+                        ? 'La dinámica ya avanzó a la siguiente fase: ya no se pueden borrar los datos.'
                         : 'No se pudieron borrar tus datos. Revisa tu conexión e inténtalo de nuevo.');
                 }
             }
             localStorage.removeItem('ia_student_data');
+            studentPhase = null;
             document.getElementById('studentName').value = '';
             document.getElementById('mainDial').value = '50';
             document.getElementById('dialSection').classList.add('hidden');
             document.getElementById('dialSection').classList.remove('flex');
+            document.getElementById('studentResults').classList.add('hidden');
             document.getElementById('loginSection').classList.remove('hidden');
             document.getElementById('saveStatus').innerText = 'Mueve el dial para registrar tu respuesta';
+        }
+
+        // El profesor decide si los estudiantes ven los resultados y qué comparación
+        function renderStudentResults(server) {
+            const box = document.getElementById('studentResults');
+            if (!server.showResults || !server.averages) {
+                box.classList.add('hidden');
+                return;
+            }
+            box.classList.remove('hidden');
+            const view = comparisonInfo(server.resultsView);
+            document.getElementById('studentResultsTitle').innerText = view.title;
+            studentChart = drawChart('studentChart', studentChart, view.key, server.averages);
         }
 
         // ==========================================
         // LÓGICA DEL PROFESOR / ADMIN
         // ==========================================
+        function showAdminLogin(message) {
+            sessionStorage.removeItem('ia_admin_key');
+            document.getElementById('adminView').classList.add('hidden');
+            document.getElementById('adminLogin').classList.remove('hidden');
+            document.getElementById('adminLogin').classList.add('flex');
+            document.getElementById('adminLoginError').innerText = message;
+            document.getElementById('adminKeyInput').focus();
+        }
+
+        function showAdminView() {
+            document.getElementById('adminLogin').classList.add('hidden');
+            document.getElementById('adminLogin').classList.remove('flex');
+            document.getElementById('adminView').classList.remove('hidden');
+            document.body.classList.remove('flex', 'items-center');
+            fetchAdminData();
+        }
+
+        async function adminLogin(event) {
+            event.preventDefault();
+            const adminKey = document.getElementById('adminKeyInput').value;
+            if (!adminKey) return;
+
+            const button = document.getElementById('adminLoginBtn');
+            button.disabled = true;
+            button.innerText = 'Verificando...';
+            try {
+                await postAction({ action: 'list', adminKey: adminKey });
+                sessionStorage.setItem('ia_admin_key', adminKey);
+                document.getElementById('adminKeyInput').value = '';
+                showAdminView();
+            } catch (err) {
+                showAdminLogin(err.message === 'unauthorized' ? 'Clave incorrecta.' : 'No se pudo conectar. Inténtalo de nuevo.');
+            } finally {
+                button.disabled = false;
+                button.innerText = 'Entrar';
+            }
+        }
+
         async function fetchAdminData() {
             const list = document.getElementById('adminList');
             list.innerHTML = '<p class="text-center text-gray-400 mt-10">Actualizando datos desde Drive... ⏳</p>';
-            
+
             try {
-                const response = await fetch(SCRIPT_URL);
-                const data = await response.json();
-                
-                // Actualizar interfaz de fase
+                const data = await postAction({ action: 'list', adminKey: sessionStorage.getItem('ia_admin_key') });
+
                 globalPhase = parseInt(data.currentPhase);
-                document.getElementById('currentPhaseLabel').innerText = globalPhase === 1 ? 'Fase 1 (Antes)' : 'Fase 2 (Después)';
-                document.getElementById('btnFase1').classList.toggle('hidden', globalPhase === 1);
-                document.getElementById('btnFase2').classList.toggle('hidden', globalPhase === 2);
+                showResults = !!data.showResults;
+                resultsView = comparisonInfo(data.resultsView).key;
+
+                document.getElementById('currentPhaseLabel').innerText = `Fase ${globalPhase} · ${phaseInfo(globalPhase).short}`;
+                buildPhaseButtons();
+                buildComparisonButtons();
+                updateResultsButton();
 
                 processAdminData(data.data);
             } catch (error) {
+                if (error.message === 'unauthorized') return showAdminLogin('La clave ya no es válida.');
                 list.innerHTML = '<p class="text-center text-red-500 mt-10">Error al conectar con Drive. Revisa tu SCRIPT_URL.</p>';
             }
         }
 
+        // Un botón por fase; el de la fase en curso queda marcado
+        function buildPhaseButtons() {
+            document.getElementById('phaseButtons').innerHTML = PHASES.map(p => `
+                <button onclick="changePhase(${p.phase})" title="${p.question}"
+                    class="px-3 py-1 rounded text-sm font-bold border-2 ${p.phase === globalPhase
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-100'}">${p.phase}. ${p.short}</button>
+            `).join('');
+        }
+
+        // Elige qué fases se comparan, en el tablero y en la pantalla de los estudiantes
+        function buildComparisonButtons() {
+            document.getElementById('comparisonButtons').innerHTML = COMPARISONS.map(c => `
+                <button onclick="changeComparison('${c.key}')"
+                    class="px-3 py-1 rounded text-sm font-bold border-2 ${c.key === resultsView
+                        ? 'bg-gray-700 text-white border-gray-700'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}">${c.button}</button>
+            `).join('');
+        }
+
+        function updateResultsButton() {
+            const button = document.getElementById('toggleResultsBtn');
+            button.innerText = showResults ? '🙈 Ocultar a los estudiantes' : '👀 Mostrar a los estudiantes';
+            button.className = showResults
+                ? 'px-3 py-1 rounded text-sm font-bold bg-green-600 text-white hover:bg-green-700'
+                : 'px-3 py-1 rounded text-sm font-bold bg-white text-gray-600 border-2 border-gray-300 hover:bg-gray-100';
+        }
+
         function changePhase(phase) {
-            if(!confirm(`¿Estás seguro de cambiar a la Fase ${phase}?`)) return;
-            
-            // La clave se recuerda solo en esta pestaña
-            const adminKey = sessionStorage.getItem('ia_admin_key') || prompt('Clave del profesor (ADMIN_KEY):');
-            if (!adminKey) return;
+            if (phase === globalPhase) return;
+            if(!confirm(`¿Cambiar a la Fase ${phase}?\n\nPregunta: ${phaseInfo(phase).question}\nMomento: ${phaseInfo(phase).moment}`)) return;
 
             document.getElementById('currentPhaseLabel').innerText = 'Cambiando...';
+            sendAdminChange({ action: 'set_phase', phase: phase }, 'No se pudo cambiar la fase. Inténtalo de nuevo.');
+        }
 
-            postAction({ action: 'set_phase', phase: phase, adminKey: adminKey })
-            .then(() => {
-                sessionStorage.setItem('ia_admin_key', adminKey);
-                fetchAdminData(); // Recargar todo para mostrar el nuevo estado
-            })
+        function changeComparison(key) {
+            resultsView = key;
+            buildComparisonButtons();
+            sendAdminChange({ action: 'set_results', show: showResults, view: key }, 'No se pudo cambiar la comparación.');
+        }
+
+        function toggleResults() {
+            sendAdminChange({ action: 'set_results', show: !showResults, view: resultsView }, 'No se pudo cambiar la visibilidad.');
+        }
+
+        function sendAdminChange(payload, errorMessage) {
+            postAction({ ...payload, adminKey: sessionStorage.getItem('ia_admin_key') })
+            .then(() => fetchAdminData()) // Recargar todo para mostrar el nuevo estado
             .catch(err => {
-                sessionStorage.removeItem('ia_admin_key');
-                alert(err.message === 'unauthorized' ? 'Clave incorrecta.' : 'No se pudo cambiar la fase. Inténtalo de nuevo.');
+                if (err.message === 'unauthorized') return showAdminLogin('La clave ya no es válida.');
+                alert(errorMessage);
                 fetchAdminData();
             });
         }
 
         function processAdminData(data) {
             const students = {};
-            // Agrupar por dispositivo, con un valor por fase
+            // Agrupar por código, con un valor por fase
             data.forEach(row => {
-                if (!students[row.clientId]) {
-                    students[row.clientId] = { name: row.name, avatar: row.avatar, valFase1: null, valFase2: null };
+                if (!students[row.code]) {
+                    students[row.code] = { code: row.code, name: row.name, avatar: row.avatar, values: {} };
                 }
-                if (row.phase == 1) students[row.clientId].valFase1 = parseInt(row.value);
-                if (row.phase == 2) students[row.clientId].valFase2 = parseInt(row.value);
+                students[row.code].values[row.phase] = parseInt(row.value);
             });
 
             const list = document.getElementById('adminList');
-            list.innerHTML = '';
-            
-            let totalAntes = 0;
-            let totalDespues = 0;
-            let count = Object.keys(students).length;
+            const people = Object.values(students);
+            const view = comparisonInfo(resultsView);
+            document.getElementById('chartTitle').innerText = view.title;
 
-            if (count === 0) {
+            if (people.length === 0) {
                 list.innerHTML = '<p class="text-center text-gray-400 mt-10">Nadie ha participado aún.</p>';
-                updateChart(0, 0);
+                adminChart = drawChart('adminChart', adminChart, resultsView, {});
                 return;
             }
 
-            Object.values(students).forEach(s => {
-                // Si no han guardado en Fase 2, se asume que su postura no cambió respecto a la Fase 1
-                const antes = s.valFase1 !== null ? s.valFase1 : 50;
-                const despues = s.valFase2 !== null ? s.valFase2 : antes; 
-
-                totalAntes += antes;
-                totalDespues += despues;
-
-                list.innerHTML += `
-                    <div class="bg-white p-4 rounded-lg shadow-sm mb-3 border border-gray-100 flex items-center gap-4">
-                        <div class="text-3xl">${escapeHtml(s.avatar)}</div>
-                        <div class="flex-1">
-                            <h3 class="font-bold text-gray-700">${escapeHtml(s.name)}</h3>
-                            <div class="text-xs text-gray-500 mt-1">
-                                <div><span class="inline-block w-16 text-gray-400">Antes:</span> 
-                                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1 mb-2 inline-block align-middle w-32">
-                                      <div class="bg-gray-400 h-1.5 rounded-full" style="width: ${antes}%"></div>
-                                    </div> ${antes}%
-                                </div>
-                                <div class="${s.valFase2 === null ? 'opacity-40' : ''}"><span class="inline-block w-16 text-indigo-500 font-bold">Después:</span> 
-                                    <div class="w-full bg-indigo-100 rounded-full h-1.5 mt-1 inline-block align-middle w-32">
-                                      <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${despues}%"></div>
-                                    </div> <span class="text-indigo-600 font-bold">${s.valFase2 === null ? 'Pendiente' : despues + '%'}</span>
-                                </div>
-                            </div>
-                        </div>
+            list.innerHTML = people.map(s => `
+                <div class="bg-white p-4 rounded-lg shadow-sm mb-3 border border-gray-100 flex items-center gap-4">
+                    <div class="text-3xl">${escapeHtml(s.avatar)}</div>
+                    <div class="flex-1 text-xs text-gray-500">
+                        <h3 class="font-bold text-gray-700 text-sm">${escapeHtml(s.name)}
+                            <span class="font-mono font-normal text-gray-400">${escapeHtml(s.code)}</span>
+                        </h3>
+                        ${view.pairs.map(pair => pairRows(s, pair)).join('')}
                     </div>
-                `;
-            });
+                </div>
+            `).join('');
 
-            updateChart(totalAntes / count, totalDespues / count);
+            // Promedio de cada fase, solo entre quienes ya respondieron esa pregunta
+            const averages = {};
+            PHASES.forEach(p => {
+                const values = people.map(s => s.values[p.phase]).filter(v => v != null);
+                if (values.length) averages[p.phase] = values.reduce((a, b) => a + b, 0) / values.length;
+            });
+            adminChart = drawChart('adminChart', adminChart, resultsView, averages);
         }
 
-        function updateChart(avgAntes, avgDespues) {
-            const ctx = document.getElementById('adminChart').getContext('2d');
-            if (chartInstance) {
-                chartInstance.data.datasets[0].data = [avgAntes, avgDespues];
-                chartInstance.update();
-            } else {
-                chartInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Antes de la charla', 'Después de la charla'],
-                        datasets: [{
-                            label: 'Cercanía Promedio (%)',
-                            data: [avgAntes, avgDespues],
-                            backgroundColor: ['#9ca3af', '#4f46e5'],
-                            borderRadius: 8
-                        }]
-                    },
-                    options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
-                });
+        // Las dos mediciones de un par y, si están las dos, cuánto cambió
+        function pairRows(student, pair) {
+            const from = student.values[pair.from];
+            const to = student.values[pair.to];
+            const change = from != null && to != null ? to - from : null;
+
+            return [pair.from, pair.to].map(phase => {
+                const p = phaseInfo(phase);
+                const value = student.values[phase];
+                return `
+                    <div class="flex items-center gap-2 mt-1 ${value == null ? 'opacity-40' : ''}">
+                        <span class="w-32 shrink-0 font-bold" style="color: ${p.color}">${p.short}</span>
+                        <div class="w-24 bg-gray-100 rounded-full h-1.5">
+                            <div class="h-1.5 rounded-full" style="width: ${value == null ? 0 : value}%; background: ${p.color}"></div>
+                        </div>
+                        <span class="w-16">${value == null ? 'Pendiente' : value + '%'}</span>
+                        ${phase === pair.to && change !== null ? `
+                            <span class="font-bold ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-400'}">
+                                ${change > 0 ? '▲ +' : change < 0 ? '▼ ' : '='}${change === 0 ? '' : change}${change === 0 ? '' : '%'}
+                            </span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Dibuja (o actualiza) un gráfico de barras con las fases de la comparación
+        function drawChart(canvasId, chart, comparisonKey, averages) {
+            const phases = comparisonPhases(comparisonKey);
+            const labels = phases.map(phase => phaseInfo(phase).short);
+            const values = phases.map(phase => averages[phase] || 0);
+            const colors = phases.map(phase => phaseInfo(phase).color);
+
+            if (chart) {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = values;
+                chart.data.datasets[0].backgroundColor = colors;
+                chart.update();
+                return chart;
             }
+            return new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Promedio (%)', data: values, backgroundColor: colors, borderRadius: 8 }] },
+                options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+            });
         }
     </script>
 </body>
